@@ -7,7 +7,12 @@
     "lint": "markdownlint-cli2 blog_content/**/*.md && textlint blog_content/**/*.md",
     "lint:fix": "markdownlint-cli2 --fix blog_content/**/*.md && textlint --fix blog_content/**/*.md",
     "code:check": "biome check packages/",
-    "code:fix": "biome check --write packages/"
+    "code:fix": "biome check --write packages/",
+    "build": "pnpm -r build",
+    "build:cdk": "pnpm --filter cdk build",
+    "build:api": "pnpm --filter api build",
+    "test": "pnpm -r test",
+    "test:cdk": "pnpm --filter cdk test"
   },
   "keywords": [],
   "author": "",
