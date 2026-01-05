@@ -1,17 +1,27 @@
 #!/usr/bin/env node
+import * as path from 'node:path';
 import * as cdk from 'aws-cdk-lib';
+import * as dotenv from 'dotenv';
 import { SwitchBotDataPipelineStack } from '../lib/cdk-stack';
 
+// Load environment variables from .env file
+dotenv.config({ path: path.join(__dirname, '../../../.env') });
+
 const app = new cdk.App();
+
+// Get region from environment variable or use default
+const region = process.env.AWS_REGION || 'ap-northeast-1';
+
 new SwitchBotDataPipelineStack(app, 'SwitchBotDataPipelineStack', {
-  /* If you don't specify 'env', this stack will be environment-agnostic.
-   * Account/Region-dependent features and context lookups will not work,
-   * but a single synthesized template can be deployed anywhere. */
-  /* Uncomment the next line to specialize this stack for the AWS Account
-   * and Region that are implied by the current CLI configuration. */
-  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
-  /* Uncomment the next line if you know exactly what Account and Region you
-   * want to deploy the stack to. */
-  // env: { account: '123456789012', region: 'us-east-1' },
-  /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
+  env: {
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: region,
+  },
+  description:
+    'SwitchBot Data Pipeline - Lambda functions and S3 buckets for data collection',
+  tags: {
+    Project: 'SwitchBotDataPipeline',
+    Environment: 'Development',
+    ManagedBy: 'CDK',
+  },
 });

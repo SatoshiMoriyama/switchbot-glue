@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import * as cdk from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import type { Construct } from 'constructs';
 import * as dotenv from 'dotenv';
@@ -60,6 +61,13 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
       );
     }
 
+    // CloudWatch Log Group for Lambda function
+    const lambdaLogGroup = new logs.LogGroup(this, 'SwitchBotLambdaLogGroup', {
+      logGroupName: `/aws/lambda/SwitchBotDataCollectionFunction`,
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // Lambda function for SwitchBot data collection
     this.dataCollectionLambda = new lambda.Function(
       this,
@@ -75,9 +83,9 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
           SWITCHBOT_TOKEN: switchbotToken,
           SWITCHBOT_SECRET: switchbotSecret,
           S3_RAW_BUCKET: this.rawDataBucket.bucketName,
-          AWS_REGION: this.region,
         },
         description: 'Collects data from SwitchBot API and stores in S3',
+        logGroup: lambdaLogGroup,
       },
     );
 
@@ -87,9 +95,19 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
       description: 'Name of the S3 bucket for raw data',
     });
 
+    new cdk.CfnOutput(this, 'CuratedDataBucketName', {
+      value: this.curatedDataBucket.bucketName,
+      description: 'Name of the S3 bucket for curated data',
+    });
+
     new cdk.CfnOutput(this, 'LambdaFunctionName', {
       value: this.dataCollectionLambda.functionName,
       description: 'Name of the data collection Lambda function',
+    });
+
+    new cdk.CfnOutput(this, 'LambdaFunctionArn', {
+      value: this.dataCollectionLambda.functionArn,
+      description: 'ARN of the data collection Lambda function',
     });
   }
 }

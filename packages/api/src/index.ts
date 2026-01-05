@@ -14,7 +14,6 @@ interface LambdaEnvironment {
   SWITCHBOT_TOKEN: string;
   SWITCHBOT_SECRET: string;
   S3_RAW_BUCKET: string;
-  AWS_REGION: string;
 }
 
 /**
@@ -35,7 +34,6 @@ function validateEnvironment(): LambdaEnvironment {
     SWITCHBOT_TOKEN: process.env.SWITCHBOT_TOKEN as string,
     SWITCHBOT_SECRET: process.env.SWITCHBOT_SECRET as string,
     S3_RAW_BUCKET: process.env.S3_RAW_BUCKET as string,
-    AWS_REGION: process.env.AWS_REGION || 'us-east-1',
   };
 }
 
@@ -65,7 +63,7 @@ export const handler = async (
     // Initialize S3 storage client
     const s3Storage = new S3DataStorage({
       bucketName: env.S3_RAW_BUCKET,
-      region: env.AWS_REGION,
+      region: process.env.AWS_REGION || 'ap-northeast-1',
     });
 
     console.log('Fetching device data from SwitchBot API...');

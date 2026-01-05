@@ -8,8 +8,12 @@
     "build": "tsc",
     "build:lambda": "cd ../api && pnpm run build",
     "predeploy": "pnpm run build && pnpm run build:lambda",
-    "deploy": "cdk deploy",
+    "deploy": "cdk deploy --require-approval never",
+    "deploy:with-approval": "cdk deploy",
     "destroy": "cdk destroy",
+    "diff": "cdk diff",
+    "synth": "cdk synth",
+    "bootstrap": "cdk bootstrap",
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk"

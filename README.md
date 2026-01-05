@@ -88,15 +88,14 @@ pnpm run deploy
 
 ### Lambda関数の手動実行テスト
 
+AWS Consoleから、またはAWS CLIで実行できます：
+
 ```bash
 # AWS CLIでLambda関数を実行
 aws lambda invoke \
-  --function-name SwitchBotDataPipelineStack-SwitchBotDataCollectionFunction-XXXXX \
+  --function-name <function-name> \
   --payload '{}' \
   response.json
-
-# 実行結果を確認
-cat response.json
 ```
 
 ## 開発
