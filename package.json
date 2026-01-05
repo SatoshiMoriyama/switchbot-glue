@@ -12,7 +12,8 @@
     "build:cdk": "pnpm --filter cdk build",
     "build:api": "pnpm --filter api build",
     "test": "pnpm -r test",
-    "test:cdk": "pnpm --filter cdk test"
+    "test:cdk": "pnpm --filter cdk test",
+    "prepare": "husky"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +21,8 @@
   "packageManager": "pnpm@10.20.0",
   "devDependencies": {
     "@biomejs/biome": "^2.3.10",
+    "husky": "^9.0.11",
+    "lint-staged": "^15.2.10",
     "markdownlint-cli2": "^0.20.0",
     "textlint": "^15.5.0",
     "textlint-rule-preset-ja-spacing": "^2.4.3",
@@ -27,5 +30,14 @@
     "textlint-rule-preset-japanese": "^10.0.4",
     "textlint-rule-prh": "^6.1.0",
     "textlint-rule-spellcheck-tech-word": "^5.0.0"
+  },
+  "lint-staged": {
+    "packages/**/*.{js,ts,jsx,tsx,json}": [
+      "biome check"
+    ],
+    "blog_content/**/*.md": [
+      "markdownlint-cli2",
+      "textlint"
+    ]
   }
 }
