@@ -1,5 +1,5 @@
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { S3DataStorage } from '../s3-client';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 // Mock S3Client
 jest.mock('@aws-sdk/client-s3', () => ({

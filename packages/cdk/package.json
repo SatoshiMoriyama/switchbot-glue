@@ -6,6 +6,10 @@
   },
   "scripts": {
     "build": "tsc",
+    "build:lambda": "cd ../api && pnpm run build",
+    "predeploy": "pnpm run build && pnpm run build:lambda",
+    "deploy": "cdk deploy",
+    "destroy": "cdk destroy",
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk"
@@ -21,6 +25,7 @@
   },
   "dependencies": {
     "aws-cdk-lib": "2.232.1",
-    "constructs": "^10.0.0"
+    "constructs": "^10.0.0",
+    "dotenv": "^17.2.3"
   }
 }

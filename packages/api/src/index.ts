@@ -32,9 +32,9 @@ function validateEnvironment(): LambdaEnvironment {
   }
 
   return {
-    SWITCHBOT_TOKEN: process.env.SWITCHBOT_TOKEN!,
-    SWITCHBOT_SECRET: process.env.SWITCHBOT_SECRET!,
-    S3_RAW_BUCKET: process.env.S3_RAW_BUCKET!,
+    SWITCHBOT_TOKEN: process.env.SWITCHBOT_TOKEN as string,
+    SWITCHBOT_SECRET: process.env.SWITCHBOT_SECRET as string,
+    S3_RAW_BUCKET: process.env.S3_RAW_BUCKET as string,
     AWS_REGION: process.env.AWS_REGION || 'us-east-1',
   };
 }

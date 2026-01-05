@@ -1,36 +1,147 @@
-# Tech Blog Workspace
+# SwitchBot Data Pipeline
 
-技術ブログ記事の執筆・校正するためのワークスペースです。
+SwitchBot APIからデータを取得し、AWS Glueを使用してデータパイプラインを構築するプロジェクトです。
 
 ## 概要
 
-このプロジェクトは、技術ブログの記事を効率的に執筆し、textlint を使用して文章の品質を保つためのワークスペースです。
+このプロジェクトは、SwitchBot APIから定期的にデバイスデータを取得し、AWS上でデータ処理パイプラインを構築します。
 
-## 構成
+## アーキテクチャ
+
+- **Lambda関数**: SwitchBot APIからデータを取得
+- **S3**: Raw/Curatedデータの保存
+- **AWS Glue**: ETLジョブによるデータ変換
+- **Amazon Athena**: データクエリ・分析
+
+## プロジェクト構成
 
 ```
-techblog_workspace/
-├── blog_content/           # 公開用のブログ記事
-│   └── blog.md
-├── packages/               # モノレポ構成の検証用パッケージ
-│   ├── package-a/          # 個別パッケージ例
-│   └── package-b/          # 個別パッケージ例
-├── .kiro/                  # Kiro設定ファイル
-│   ├── hooks/              # エージェントフック
-│   ├── settings/           # MCP設定など
-│   └── steering/           # ステアリングファイル
-│       └── blog-evaluation.md
-├── .vscode/                # VSCode設定
-│   └── settings.json
-├── node_modules/           # 依存関係
-├── .gitignore
-├── .textlintrc.json        # textlint設定
-├── biome.json              # Biome設定（TypeScript用）
-├── package.json
-├── pnpm-lock.yaml
-├── pnpm-workspace.yaml
+switchbot-data-pipeline/
+├── packages/
+│   ├── api/                # Lambda関数のTypeScriptコード
+│   │   ├── src/
+│   │   │   ├── index.ts           # Lambda handler
+│   │   │   ├── switchbot-client.ts # SwitchBot APIクライアント
+│   │   │   └── s3-client.ts       # S3データ保存クライアント
+│   │   └── package.json
+│   └── cdk/                # AWS CDKインフラストラクチャコード
+│       ├── lib/
+│       │   └── cdk-stack.ts       # CDKスタック定義
+│       ├── glue-scripts/          # Glue ETL Job用Pythonスクリプト
+│       └── package.json
+├── .env                    # 環境変数（ローカル開発用）
+├── .env.example           # 環境変数のテンプレート
 └── README.md
 ```
+
+## セットアップ
+
+### 1. 依存関係のインストール
+
+```bash
+pnpm install
+```
+
+### 2. 環境変数の設定
+
+`.env.example`をコピーして`.env`ファイルを作成し、SwitchBot APIの認証情報を設定してください：
+
+```bash
+cp .env.example .env
+```
+
+`.env`ファイルを編集して、以下の値を設定：
+
+```env
+# SwitchBot API Configuration
+# SwitchBotアプリから取得: プロフィール > 設定 > アプリバージョン > 開発者向けオプション
+SWITCHBOT_TOKEN=your_switchbot_token_here
+SWITCHBOT_SECRET=your_switchbot_secret_here
+
+# AWS Configuration
+AWS_REGION=ap-northeast-1
+```
+
+### 3. SwitchBot API認証情報の取得方法
+
+1. SwitchBotアプリを開く
+2. プロフィール > 設定 > アプリバージョン をタップ
+3. 「開発者向けオプション」をタップ
+4. トークンとシークレットをコピーして`.env`ファイルに設定
+
+### 4. AWSの設定
+
+AWS CLIが設定されていることを確認してください：
+
+```bash
+aws configure
+```
+
+## デプロイ
+
+### Lambda関数とS3バケットのデプロイ
+
+```bash
+cd packages/cdk
+pnpm run deploy
+```
+
+### Lambda関数の手動実行テスト
+
+```bash
+# AWS CLIでLambda関数を実行
+aws lambda invoke \
+  --function-name SwitchBotDataPipelineStack-SwitchBotDataCollectionFunction-XXXXX \
+  --payload '{}' \
+  response.json
+
+# 実行結果を確認
+cat response.json
+```
+
+## 開発
+
+### テストの実行
+
+```bash
+# API関数のテスト
+cd packages/api
+pnpm test
+
+# CDKのテスト
+cd packages/cdk
+pnpm test
+```
+
+### ローカル開発
+
+```bash
+# TypeScriptのビルド（watch mode）
+cd packages/api
+pnpm run watch
+
+# CDKのビルド（watch mode）
+cd packages/cdk
+pnpm run watch
+```
+
+## トラブルシューティング
+
+### 環境変数が設定されていない場合
+
+```
+Error: Missing required environment variables: SWITCHBOT_TOKEN, SWITCHBOT_SECRET
+```
+
+→ `.env`ファイルが正しく設定されているか確認してください。
+
+### AWS権限エラーの場合
+
+```
+AccessDenied: User is not authorized to perform: s3:PutObject
+```
+
+→ AWS CLIの認証情報とIAM権限を確認してください。
 
 ## 利用パッケージ、拡張ツール
 

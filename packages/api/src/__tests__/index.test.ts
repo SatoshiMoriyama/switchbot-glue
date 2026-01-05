@@ -5,8 +5,8 @@ import { handler } from '../index';
 jest.mock('../switchbot-client');
 jest.mock('../s3-client');
 
-import { SwitchBotClient } from '../switchbot-client';
 import { S3DataStorage } from '../s3-client';
+import { SwitchBotClient } from '../switchbot-client';
 
 const mockSwitchBotClient = SwitchBotClient as jest.MockedClass<
   typeof SwitchBotClient
