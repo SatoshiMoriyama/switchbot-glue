@@ -34,8 +34,8 @@ SwitchBot APIからデータを取得し、AWS Glueを使用してデータパ�
     - S3読み書き権限の設定
     - _要件: 6.3_
 
-- [ ] 3. SwitchBot API統合とLambda関数の実装
-  - [ ] 3.1 SwitchBot APIクライアントの実装
+- [-] 3. SwitchBot API統合とLambda関数の実装
+  - [x] 3.1 SwitchBot APIクライアントの実装
     - `packages/api`でSwitchBot APIクライアントクラスを作成
     - 認証署名生成ロジック
     - HTTPSリクエスト送信機能
@@ -45,7 +45,7 @@ SwitchBot APIからデータを取得し、AWS Glueを使用してデータパ�
     - **プロパティ1: API通信とデータ取得**
     - **検証対象: 要件 1.1, 1.2**
 
-  - [ ] 3.3 Lambda関数のメイン処理実装
+  - [x] 3.3 Lambda関数のメイン処理実装
     - `packages/api`でLambda handlerの実装
     - SwitchBot APIからのデータ取得
     - タイムスタンプ付きでS3への保存
