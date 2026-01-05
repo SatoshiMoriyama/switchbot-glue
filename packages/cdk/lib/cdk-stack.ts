@@ -1,19 +1,46 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
-import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as glue from 'aws-cdk-lib/aws-glue';
 import * as iam from 'aws-cdk-lib/aws-iam';
 
 export class SwitchBotDataPipelineStack extends cdk.Stack {
+  public readonly rawDataBucket: s3.Bucket;
+  public readonly curatedDataBucket: s3.Bucket;
+  public readonly scriptsBucket: s3.Bucket;
+  public readonly lambdaExecutionRole: iam.Role;
+
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // SwitchBot Data Pipeline infrastructure will be defined here
-    // This stack will include:
-    // - S3 buckets for raw and curated data
-    // - Lambda function for SwitchBot API integration
-    // - Glue database, crawlers, and ETL jobs
-    // - IAM roles and policies
+    // S3 Buckets for data pipeline
+    this.rawDataBucket = new s3.Bucket(this, 'SwitchBotRawDataBucket', {
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
+    });
+
+    this.curatedDataBucket = new s3.Bucket(this, 'SwitchBotCuratedDataBucket', {
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
+    });
+
+    this.scriptsBucket = new s3.Bucket(this, 'SwitchBotScriptsBucket', {
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
+    });
+
+    // IAM Role for Lambda function execution
+    this.lambdaExecutionRole = new iam.Role(
+      this,
+      'SwitchBotLambdaExecutionRole',
+      {
+        assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+        managedPolicies: [
+          iam.ManagedPolicy.fromAwsManagedPolicyName(
+            'service-role/AWSLambdaBasicExecutionRole',
+          ),
+        ],
+      },
+    );
+
+    // Grant S3 permissions using CDK's high-level methods
+    this.rawDataBucket.grantReadWrite(this.lambdaExecutionRole);
+    this.curatedDataBucket.grantReadWrite(this.lambdaExecutionRole);
   }
 }
