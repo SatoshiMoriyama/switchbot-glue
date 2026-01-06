@@ -62,7 +62,7 @@ SwitchBot APIからデータを取得し、AWS Glueを使用してデータパ�
 - [x] 4. チェックポイント - Lambda関数とS3統合のテスト
   - すべてのテストが通ることを確認し、質問があれば聞いてください。
 
-- [ ] 5. デプロイメント準備と環境設定
+- [x] 5. デプロイメント準備と環境設定
   - [x] 5.1 環境変数とシークレット管理の設定
     - SwitchBot APIトークンとシークレットの設定
     - AWS Systems Manager Parameter StoreまたはSecrets Managerの利用
