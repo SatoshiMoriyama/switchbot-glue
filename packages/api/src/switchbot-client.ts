@@ -1,4 +1,4 @@
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 
 /**
  * SwitchBot API Response interface
@@ -6,9 +6,17 @@ import * as crypto from 'crypto';
 export interface SwitchBotApiResponse {
   statusCode: number;
   body: {
-    devices?: Device[];
+    deviceList?: Device[];
     infraredRemoteList?: InfraredRemote[];
     message?: string;
+    // Device status fields for temperature/humidity sensors
+    deviceId?: string;
+    deviceType?: string;
+    temperature?: number;
+    humidity?: number;
+    battery?: number;
+    version?: string;
+    hubDeviceId?: string;
   };
   message: string;
 }
@@ -59,33 +67,24 @@ export class SwitchBotClient {
   }
 
   /**
-   * Generate authentication signature for SwitchBot API
-   * @param timestamp - Current timestamp in milliseconds
-   * @param nonce - Random nonce string
-   * @returns Authentication signature
-   */
-  private generateSignature(timestamp: number, nonce: string): string {
-    const data = this.token + timestamp + nonce;
-    return crypto
-      .createHmac('sha256', this.secret)
-      .update(data, 'utf8')
-      .digest('base64');
-  }
-
-  /**
    * Generate authentication headers for SwitchBot API requests
    * @returns Headers object with authentication information
    */
   private generateAuthHeaders(): Record<string, string> {
-    const timestamp = Date.now();
-    const nonce = crypto.randomUUID();
-    const signature = this.generateSignature(timestamp, nonce);
+    const t = Date.now();
+    const nonce = 'requestID';
+    const data = this.token + t + nonce;
+    const sign = crypto
+      .createHmac('sha256', this.secret)
+      .update(data)
+      .digest('base64')
+      .toUpperCase();
 
     return {
-      Authorization: this.token,
-      sign: signature,
-      t: timestamp.toString(),
+      Authorization: this.token, // No Bearer prefix needed
+      sign: sign,
       nonce: nonce,
+      t: t.toString(),
       'Content-Type': 'application/json',
     };
   }

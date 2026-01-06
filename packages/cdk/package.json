@@ -6,8 +6,6 @@
   },
   "scripts": {
     "build": "tsc",
-    "build:lambda": "cd ../api && pnpm run build",
-    "predeploy": "pnpm run build && pnpm run build:lambda",
     "deploy": "cdk deploy --require-approval never",
     "deploy:with-approval": "cdk deploy",
     "destroy": "cdk destroy",

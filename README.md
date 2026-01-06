@@ -79,11 +79,24 @@ aws configure
 
 ## デプロイ
 
-### Lambda関数とS3バケットのデプロイ
+### 方法1: ルートディレクトリから（推奨）
+
+```bash
+# 全自動デプロイ（依存関係インストール、ビルド、デプロイを一括実行）
+./deploy.sh
+```
+
+### 方法2: CDKディレクトリから
 
 ```bash
 cd packages/cdk
 pnpm run deploy
+```
+
+### 方法3: ルートからCDKデプロイのみ
+
+```bash
+pnpm run deploy:cdk
 ```
 
 ### Lambda関数の手動実行テスト

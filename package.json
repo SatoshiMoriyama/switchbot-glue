@@ -11,6 +11,9 @@
     "build": "pnpm -r build",
     "build:cdk": "pnpm --filter cdk build",
     "build:api": "pnpm --filter api build",
+    "deploy": "pnpm --filter api build && pnpm --filter cdk run deploy",
+    "cdk:deploy": "pnpm --filter api build && pnpm --filter cdk run deploy",
+    "cdk:destroy": "pnpm --filter cdk run destroy",
     "test": "pnpm -r test",
     "test:cdk": "pnpm --filter cdk test",
     "prepare": "husky"

@@ -68,20 +68,75 @@ export const handler = async (
 
     console.log('Fetching device data from SwitchBot API...');
 
-    // Fetch data from SwitchBot API
-    const apiResponse: SwitchBotApiResponse =
+    // Fetch device list from SwitchBot API
+    const devicesResponse: SwitchBotApiResponse =
       await switchBotClient.getDevices();
 
-    console.log('API Response received:', {
-      statusCode: apiResponse.statusCode,
-      message: apiResponse.message,
-      deviceCount: apiResponse.body.devices?.length || 0,
-      infraredRemoteCount: apiResponse.body.infraredRemoteList?.length || 0,
+    console.log('Device list received:', {
+      statusCode: devicesResponse.statusCode,
+      message: devicesResponse.message,
+      deviceCount: devicesResponse.body.deviceList?.length || 0,
+      infraredRemoteCount: devicesResponse.body.infraredRemoteList?.length || 0,
     });
 
-    // Save raw data to S3 with timestamp
+    // Collect device status data for temperature/humidity sensors
+    const deviceStatusData: Array<{
+      deviceInfo: any;
+      status: any;
+      timestamp: string;
+    }> = [];
+
+    if (devicesResponse.body.deviceList) {
+      for (const device of devicesResponse.body.deviceList) {
+        // Get status for temperature/humidity sensors
+        if (
+          device.deviceType === 'MeterPro' ||
+          device.deviceType === 'Meter' ||
+          device.deviceType === 'MeterPlus'
+        ) {
+          try {
+            console.log(
+              `Fetching status for ${device.deviceName} (${device.deviceId})`,
+            );
+            const statusResponse = await switchBotClient.getDeviceStatus(
+              device.deviceId,
+            );
+
+            deviceStatusData.push({
+              deviceInfo: device,
+              status: statusResponse.body,
+              timestamp: new Date().toISOString(),
+            });
+
+            console.log(
+              `Status received for ${device.deviceName}:`,
+              statusResponse.body,
+            );
+          } catch (error) {
+            console.error(
+              `Failed to get status for device ${device.deviceId}:`,
+              error,
+            );
+            // Continue with other devices even if one fails
+          }
+        }
+      }
+    }
+
+    // Save only temperature/humidity sensor data
+    const sensorData = {
+      deviceStatusData: deviceStatusData,
+      timestamp: new Date().toISOString(),
+      summary: {
+        totalDevicesScanned: devicesResponse.body.deviceList?.length || 0,
+        temperatureHumidityDevicesFound: deviceStatusData.length,
+        collectionTime: new Date().toISOString(),
+      },
+    };
+
+    // Save sensor data to S3
     const s3Key = await s3Storage.saveRawData(
-      apiResponse,
+      { ...devicesResponse, body: sensorData },
       context.awsRequestId,
     );
 
@@ -93,13 +148,12 @@ export const handler = async (
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        message: 'SwitchBot data collection completed successfully',
+        message:
+          'SwitchBot temperature/humidity data collection completed successfully',
         timestamp: new Date().toISOString(),
         s3Key: s3Key,
         requestId: context.awsRequestId,
-        apiStatus: apiResponse.statusCode,
-        deviceCount: apiResponse.body.devices?.length || 0,
-        infraredRemoteCount: apiResponse.body.infraredRemoteList?.length || 0,
+        temperatureHumidityDevicesCount: deviceStatusData.length,
       }),
     };
   } catch (error) {
