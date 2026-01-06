@@ -91,14 +91,13 @@ SwitchBot APIからデータを取得し、AWS Glueを使用してデータパ�
 - [x] 6. チェックポイント - デプロイメント動作確認
   - デプロイが成功し、Lambda関数が正常に動作することを確認し、質問があれば聞いてください。
 
-- [ ] 7. Glue Database、Crawler、ETL Jobの実装
-- [ ] 7. Glue Database、Crawler、ETL Jobの実装
-  - [ ] 7.1 Glue Databaseの作成
+- [x] 7. Glue Database、Crawler、ETL Jobの実装
+  - [x] 7.1 Glue Databaseの作成
     - CDKでGlue Databaseリソースを定義
     - Raw用とCurated用のテーブル管理
     - _要件: 3.1, 3.2_
 
-  - [ ] 7.2 Raw Data Crawlerの実装
+  - [x] 7.2 Raw Data Crawlerの実装
     - S3 Raw Bucketをスキャンするクローラー
     - JSONファイル構造の自動分析
     - _要件: 3.1, 3.2, 3.3_
@@ -107,7 +106,7 @@ SwitchBot APIからデータを取得し、AWS Glueを使用してデータパ�
     - **プロパティ3: Crawlerによるスキーマ分析**
     - **検証対象: 要件 3.1, 3.2**
 
-  - [ ] 7.4 Glue ETL Jobスクリプトの作成
+  - [x] 7.4 Glue ETL Jobスクリプトの作成
     - `packages/cdk/glue-scripts`でPythonスクリプトを作成
     - JSONからParquetへの変換ロジック
     - データクリーニングと構造化
@@ -117,7 +116,7 @@ SwitchBot APIからデータを取得し、AWS Glueを使用してデータパ�
     - **プロパティ5: データ変換round-trip**
     - **検証対象: 要件 4.2**
 
-  - [ ] 7.6 Curated Data Crawlerの実装
+  - [x] 7.6 Curated Data Crawlerの実装
     - S3 Curated BucketのParquetファイルをスキャン
     - 変換後データのテーブル定義作成
     - _要件: 3.2, 3.3_

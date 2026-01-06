@@ -77,7 +77,7 @@ export class S3DataStorage {
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: s3Key,
-        Body: JSON.stringify(rawData, null, 2),
+        Body: JSON.stringify(rawData), // JSON Lines形式（1行）
         ContentType: 'application/json',
         Metadata: {
           'collection-time': timestamp,

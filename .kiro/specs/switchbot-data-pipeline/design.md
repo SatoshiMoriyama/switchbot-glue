@@ -112,34 +112,107 @@ s3://bucket-name/
 #### ファイル命名規則
 - `switchbot-raw-data-{ISO8601-timestamp}.json`
 - パーティション: year/month/day/hour
+- **データ形式**: JSON Lines（1行1レコード）- Athena/Hiveの分散処理に最適化
 
-### 4. Glue Crawler
+#### データ保存形式の重要な考慮事項
+- **JSON Lines形式を採用**: `JSON.stringify(data)`（インデントなし）
+- **理由**: 
+  - Athena/Hiveは行単位で並列処理するため、JSON Linesの方がパフォーマンスが良い
+  - ファイルサイズが小さくなる（インデント不要）
+  - 複数行JSONはSerDeの設定が複雑になりがち
+  - AWS公式ドキュメントでもJSON Lines推奨
+
+### 4. Glue Data Catalog
+
+#### テーブル作成方式
+**手動テーブル作成 + Crawler更新方式を採用**
+
+1. **手動テーブル作成（CDK）**:
+   ```typescript
+   const rawDataTable = new glue.CfnTable(this, 'SwitchBotRawDataTable', {
+     tableInput: {
+       name: 'switchbot_raw_data', // 固定テーブル名
+       parameters: {
+         classification: 'json',
+         compressionType: 'none',
+       },
+       columns: [], // 空 - Crawlerが後で追加
+       partitionKeys: [
+         { name: 'year', type: 'string' },
+         { name: 'month', type: 'string' },
+         { name: 'day', type: 'string' },
+         { name: 'hour', type: 'string' },
+       ],
+     },
+   });
+   ```
+
+2. **Crawler設定（catalogTargets）**:
+   ```typescript
+   targets: {
+     catalogTargets: [
+       {
+         databaseName: 'switchbot_data_catalog',
+         tables: ['switchbot_raw_data'], // 既存テーブルを更新
+       },
+     ],
+   }
+   ```
+
+#### この方式の利点
+- **テーブル名が固定**: `switchbot_raw_data`（バケット名に依存しない）
+- **ETLスクリプトが安定**: テーブル名変更の心配なし
+- **パーティション構造の事前定義**: year/month/day/hour
+- **スキーマ進化対応**: Crawlerが新しいカラムを自動追加
+
+### 5. Glue Crawler
 
 #### 設定
-- データソース: Raw S3 Bucket
-- 出力: Glue Data Catalog
-- スケジュール: 日次実行
-- テーブルプレフィックス: `switchbot_`
+- **データソース**: 既存のData Catalogテーブル（catalogTargets）
+- **更新対象**: `switchbot_raw_data`テーブル
+- **動作**: S3の実データをスキャンしてスキーマとパーティションを更新
+- **スケジュール**: 日次実行
+- **スキーマ変更ポリシー**: `UPDATE_IN_DATABASE`（新カラム追加）
 
-#### 期待されるテーブル構造
+#### 期待されるテーブル構造（Crawler実行後）
 ```sql
-CREATE TABLE switchbot_devicestatusdata (
-  deviceinfo struct<
-    deviceid: string,
-    devicename: string,
-    devicetype: string,
-    hubdeviceid: string
+CREATE TABLE switchbot_raw_data (
+  timestamp string,
+  api_response struct<
+    statusCode: int,
+    body: struct<
+      deviceStatusData: array<struct<
+        deviceInfo: struct<
+          deviceId: string,
+          deviceName: string,
+          deviceType: string,
+          hubDeviceId: string
+        >,
+        status: struct<
+          version: string,
+          temperature: double,
+          battery: int,
+          humidity: int,
+          deviceId: string,
+          deviceType: string,
+          hubDeviceId: string
+        >,
+        timestamp: string
+      >>,
+      timestamp: string,
+      summary: struct<
+        totalDevicesScanned: int,
+        temperatureHumidityDevicesFound: int,
+        collectionTime: string
+      >
+    >,
+    message: string
   >,
-  status struct<
-    version: string,
-    temperature: double,
-    battery: int,
-    humidity: int,
-    deviceid: string,
-    devicetype: string,
-    hubdeviceid: string
-  >,
-  timestamp: string
+  metadata: struct<
+    collection_time: string,
+    api_version: string,
+    lambda_request_id: string
+  >
 )
 PARTITIONED BY (
   year string,
@@ -152,10 +225,25 @@ PARTITIONED BY (
 ### 5. Glue ETL Job
 
 #### 処理内容
-- Raw BucketからJSONデータを読み込み
-- deviceStatusDataを抽出
+- **入力**: Glue Data Catalogの`switchbot_raw_data`テーブル
+- deviceStatusDataを抽出・展開
 - Parquet形式に変換
 - Curated Bucketに保存
+
+#### ETLスクリプトの重要な設定
+```python
+# 固定テーブル名を使用
+raw_data_source = glueContext.create_dynamic_frame.from_catalog(
+    database=args['database_name'],
+    table_name="switchbot_raw_data"  # 固定名
+)
+
+# api_response.body.deviceStatusDataを展開
+flattened_df = raw_df.select(
+    explode(col("api_response.body.devicestatusdata")).alias("device_data"),
+    col("timestamp").alias("collection_timestamp")
+)
+```
 
 #### 出力スキーマ
 ```
@@ -238,6 +326,20 @@ GROUP BY device_name;
 - S3保存成功率
 
 ## 運用考慮事項
+
+### データ形式の重要な学習事項
+
+#### JSON Lines vs 整形JSON
+- **問題**: 当初、`JSON.stringify(data, null, 2)`で整形JSONを保存
+- **結果**: AthenaでHIVE_CURSOR_ERRORが発生
+- **原因**: AthenaのJsonSerDeは1行1レコード（JSON Lines）を期待
+- **解決**: `JSON.stringify(data)`でインデントなしの1行形式に変更
+
+#### テーブル名固定化の重要性
+- **問題**: S3ターゲットのCrawlerはバケット名を含むテーブル名を生成
+- **結果**: `switchbot_switchbotdatapipelinestac_switchbotrawdatabucket89_fkgdkxfi5h2c`
+- **解決**: 手動テーブル作成 + catalogTargetsでの更新方式
+- **利点**: ETLスクリプトでテーブル名が安定
 
 ### スケジューリング
 - **EventBridge Scheduler**: 15分間隔でのLambda関数定期実行
