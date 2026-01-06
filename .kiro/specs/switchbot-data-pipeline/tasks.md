@@ -75,7 +75,7 @@ SwitchBot APIからデータを取得し、AWS Glueを使用してデータパ�
     - 必要なAWS権限とプロファイル設定の確認
     - _要件: 6.2, 6.3_
 
-  - [ ] 5.3 Lambda定期実行の設定
+  - [-] 5.3 Lambda定期実行の設定
     - EventBridge（CloudWatch Events）ルールの作成
     - 15分間隔でのLambda関数実行スケジュール設定
     - Lambda関数をEventBridgeターゲットに追加
