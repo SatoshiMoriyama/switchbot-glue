@@ -4,6 +4,8 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as scheduler from 'aws-cdk-lib/aws-scheduler';
+import * as schedulerTargets from 'aws-cdk-lib/aws-scheduler-targets';
 import type { Construct } from 'constructs';
 import * as dotenv from 'dotenv';
 
@@ -89,6 +91,20 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
       },
     );
 
+    // EventBridge Scheduler for Lambda execution (every 15 minutes)
+    const schedule = new scheduler.Schedule(
+      this,
+      'SwitchBotDataCollectionScheduler',
+      {
+        schedule: scheduler.ScheduleExpression.rate(cdk.Duration.minutes(15)),
+        target: new schedulerTargets.LambdaInvoke(
+          this.dataCollectionLambda,
+          {},
+        ),
+        description: 'Triggers SwitchBot data collection every 15 minutes',
+      },
+    );
+
     // Output important values
     new cdk.CfnOutput(this, 'RawDataBucketName', {
       value: this.rawDataBucket.bucketName,
@@ -108,6 +124,11 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'LambdaFunctionArn', {
       value: this.dataCollectionLambda.functionArn,
       description: 'ARN of the data collection Lambda function',
+    });
+
+    new cdk.CfnOutput(this, 'ScheduleName', {
+      value: schedule.scheduleName,
+      description: 'Name of the EventBridge Scheduler for scheduled execution',
     });
   }
 }

@@ -7,9 +7,11 @@ SwitchBot温湿度計からデータを収集し、AWS Glueを使用してデー
 ## アーキテクチャ図
 
 ```
-[SwitchBot API] 
-       ↓ HTTPS
+[EventBridge Scheduler] 
+       ↓ 15分間隔
 [Lambda Function] 
+       ↓ HTTPS
+[SwitchBot API] 
        ↓ S3 PUT
 [Raw S3 Bucket] 
        ↓ Glue Crawler
@@ -238,7 +240,10 @@ GROUP BY device_name;
 ## 運用考慮事項
 
 ### スケジューリング
-- EventBridge: 15分間隔での定期実行
+- **EventBridge Scheduler**: 15分間隔でのLambda関数定期実行
+  - L2コンストラクト（`aws-scheduler`）を使用
+  - `LambdaInvoke`ターゲットでLambda関数を呼び出し
+  - 自動的なIAM権限設定
 - Glue Crawler: 日次実行
 - Glue ETL Job: Crawlerの後に実行
 
