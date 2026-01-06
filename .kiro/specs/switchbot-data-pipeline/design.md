@@ -2,7 +2,7 @@
 
 ## システム概要
 
-SwitchBot温湿度計からデータを収集し、AWS Glueを使用してデータパイプラインを構築するシステム。温湿度データの取得、蓄積、カタログ化、加工、分析の一連の流れを実現する。
+SwitchBot 温湿度計からデータを収集し、AWS Glue を使用してデータパイプラインを構築するシステム。温湿度データの取得、蓄積、カタログ化、加工、分析の一連の流れを実現する。
 
 ## アーキテクチャ図
 
@@ -27,26 +27,26 @@ SwitchBot温湿度計からデータを収集し、AWS Glueを使用してデー
 ### 1. Lambda Function (SwitchBot Data Collection)
 
 #### 責務
-- SwitchBot APIからデバイス一覧を取得
+- SwitchBot API からデバイス一覧を取得
 - 温湿度計（MeterPro/Meter/MeterPlus）を識別
 - 各温湿度計のステータス情報を取得
-- 構造化されたデータをS3に保存
+- 構造化されたデータを S3 に保存
 
 #### 実装詳細
 
 **環境変数:**
-- `SWITCHBOT_TOKEN`: SwitchBot APIトークン
-- `SWITCHBOT_SECRET`: SwitchBot APIシークレット
-- `S3_RAW_BUCKET`: Raw データ保存用S3バケット名
+- `SWITCHBOT_TOKEN`: SwitchBot API トークン
+- `SWITCHBOT_SECRET`: SwitchBot API シークレット
+- `S3_RAW_BUCKET`: Raw データ保存用 S3 バケット名
 
 **処理フロー:**
 1. 環境変数の検証
-2. SwitchBotClientの初期化
+2. SwitchBotClient の初期化
 3. デバイス一覧の取得 (`/v1.1/devices`)
 4. 温湿度計デバイスの識別
 5. 各デバイスのステータス取得 (`/v1.1/devices/{deviceId}/status`)
 6. データの構造化
-7. S3への保存
+7. S3 への保存
 
 **出力データ構造:**
 ```json
@@ -83,13 +83,13 @@ SwitchBot温湿度計からデータを収集し、AWS Glueを使用してデー
 ### 2. SwitchBot API Client
 
 #### 責務
-- SwitchBot API認証の処理
-- HTTPSリクエストの送信
+- SwitchBot API 認証の処理
+- HTTPS リクエストの送信
 - エラーハンドリング
 
 #### 認証方式
-- Authorization: トークン（Bearerプレフィックスなし）
-- sign: HMAC-SHA256署名（大文字変換）
+- Authorization: トークン（Bearer プレフィックスなし）
+- sign: HMAC-SHA256 署名（大文字変換）
 - nonce: "requestID"（固定値）
 - t: タイムスタンプ
 
@@ -112,15 +112,15 @@ s3://bucket-name/
 #### ファイル命名規則
 - `switchbot-raw-data-{ISO8601-timestamp}.json`
 - パーティション: year/month/day/hour
-- **データ形式**: JSON Lines（1行1レコード）- Athena/Hiveの分散処理に最適化
+- **データ形式**: JSON Lines（1 行 1 レコード）- Athena/Hive の分散処理に最適化
 
 #### データ保存形式の重要な考慮事項
 - **JSON Lines形式を採用**: `JSON.stringify(data)`（インデントなし）
 - **理由**: 
-  - Athena/Hiveは行単位で並列処理するため、JSON Linesの方がパフォーマンスが良い
+  - Athena/Hive は行単位で並列処理するため、JSON Lines の方がパフォーマンスが良い
   - ファイルサイズが小さくなる（インデント不要）
-  - 複数行JSONはSerDeの設定が複雑になりがち
-  - AWS公式ドキュメントでもJSON Lines推奨
+  - 複数行 JSON は SerDe の設定が複雑になりがち
+  - AWS 公式ドキュメントでも JSON Lines 推奨
 
 ### 4. Glue Data Catalog
 
@@ -163,14 +163,14 @@ s3://bucket-name/
 - **テーブル名が固定**: `switchbot_raw_data`（バケット名に依存しない）
 - **ETLスクリプトが安定**: テーブル名変更の心配なし
 - **パーティション構造の事前定義**: year/month/day/hour
-- **スキーマ進化対応**: Crawlerが新しいカラムを自動追加
+- **スキーマ進化対応**: Crawler が新しいカラムを自動追加
 
 ### 5. Glue Crawler
 
 #### 設定
-- **データソース**: 既存のData Catalogテーブル（catalogTargets）
-- **更新対象**: `switchbot_raw_data`テーブル
-- **動作**: S3の実データをスキャンしてスキーマとパーティションを更新
+- **データソース**: 既存の Data Catalog テーブル（catalogTargets）
+- **更新対象**: `switchbot_raw_data` テーブル
+- **動作**: S3 の実データをスキャンしてスキーマとパーティションを更新
 - **スケジュール**: 日次実行
 - **スキーマ変更ポリシー**: `UPDATE_IN_DATABASE`（新カラム追加）
 
@@ -222,28 +222,50 @@ PARTITIONED BY (
 )
 ```
 
-### 5. Glue ETL Job
+### 6. Glue ETL Job
 
 #### 処理内容
-- **入力**: Glue Data Catalogの`switchbot_raw_data`テーブル
-- deviceStatusDataを抽出・展開
-- Parquet形式に変換
-- Curated Bucketに保存
+- **入力**: Raw S3 Bucket（直接読み込み）- Crawler に依存しない
+- deviceStatusData を抽出・展開
+- Parquet 形式に変換
+- Curated Bucket に保存
 
 #### ETLスクリプトの重要な設定
 ```python
-# 固定テーブル名を使用
-raw_data_source = glueContext.create_dynamic_frame.from_catalog(
-    database=args['database_name'],
-    table_name="switchbot_raw_data"  # 固定名
+# S3から直接読み込み（Data Catalogに依存しない）
+raw_s3_path = f"s3://{args['raw_bucket']}/"
+
+raw_data_source = glueContext.create_dynamic_frame.from_options(
+    connection_type="s3",
+    connection_options={
+        "paths": [raw_s3_path],
+        "recurse": True
+    },
+    format="json",
+    transformation_ctx="raw_data_source"
 )
 
 # api_response.body.deviceStatusDataを展開
 flattened_df = raw_df.select(
-    explode(col("api_response.body.devicestatusdata")).alias("device_data"),
+    explode(col("api_response.body.deviceStatusData")).alias("device_data"),
     col("timestamp").alias("collection_timestamp")
 )
+
+# 温度フィールドは型混在のためcoalesceで処理
+processed_df = flattened_df.select(
+    col("device_data.deviceInfo.deviceId").alias("device_id"),
+    coalesce(
+        col("device_data.status.temperature.double"),
+        col("device_data.status.temperature.int").cast("double")
+    ).alias("temperature"),
+    # ... other fields
+)
 ```
+
+#### この方式の利点
+- **Crawlerに依存しない**: 新しい S3 ファイルを即座に処理可能
+- **リアルタイム性**: Raw Crawler の実行を待つ必要がない
+- **シンプルな運用**: Lambda → S3 → ETL Job の直接的なフロー
 
 #### 出力スキーマ
 ```
@@ -290,9 +312,9 @@ GROUP BY device_name;
 
 ### Lambda Function
 - 環境変数不足: 起動時エラー
-- API認証失敗: 401エラーをキャッチしてログ出力
+- API 認証失敗: 401 エラーをキャッチしてログ出力
 - デバイス個別エラー: 他デバイス処理を継続
-- S3保存失敗: リトライ機構
+- S3 保存失敗: リトライ機構
 
 ### SwitchBot Client  
 - ネットワークエラー: 詳細なエラーメッセージ
@@ -302,60 +324,78 @@ GROUP BY device_name;
 ## セキュリティ考慮事項
 
 ### 認証情報管理
-- SwitchBot トークン/シークレット: Lambda環境変数（暗号化推奨）
+- SwitchBot トークン/シークレット: Lambda 環境変数（暗号化推奨）
 - IAM ロール: 最小権限の原則
 - S3 バケット: パブリックアクセス禁止
 
 ### ネットワーク
-- HTTPS通信のみ
-- VPC内Lambda（オプション）
-- S3 VPCエンドポイント（オプション）
+- HTTPS 通信のみ
+- VPC 内 Lambda（オプション）
+- S3 VPC エンドポイント（オプション）
 
 ## 監視・ログ
 
 ### CloudWatch Logs
-- Lambda実行ログ
-- API呼び出し結果
+- Lambda 実行ログ
+- API 呼び出し結果
 - エラー詳細
 - 処理サマリー
 
 ### CloudWatch Metrics
-- Lambda実行時間
+- Lambda 実行時間
 - エラー率
 - 処理されたデバイス数
-- S3保存成功率
+- S3 保存成功率
 
 ## 運用考慮事項
 
 ### データ形式の重要な学習事項
 
 #### JSON Lines vs 整形JSON
-- **問題**: 当初、`JSON.stringify(data, null, 2)`で整形JSONを保存
-- **結果**: AthenaでHIVE_CURSOR_ERRORが発生
-- **原因**: AthenaのJsonSerDeは1行1レコード（JSON Lines）を期待
-- **解決**: `JSON.stringify(data)`でインデントなしの1行形式に変更
+- **問題**: 当初、`JSON.stringify(data, null, 2)` で整形 JSON を保存
+- **結果**: Athena で HIVE_CURSOR_ERROR が発生
+- **原因**: Athena の JsonSerDe は 1 行 1 レコード（JSON Lines）を期待
+- **解決**: `JSON.stringify(data)` でインデントなしの 1 行形式に変更
 
 #### テーブル名固定化の重要性
-- **問題**: S3ターゲットのCrawlerはバケット名を含むテーブル名を生成
+- **問題**: S3 ターゲットの Crawler はバケット名を含むテーブル名を生成
 - **結果**: `switchbot_switchbotdatapipelinestac_switchbotrawdatabucket89_fkgdkxfi5h2c`
-- **解決**: 手動テーブル作成 + catalogTargetsでの更新方式
-- **利点**: ETLスクリプトでテーブル名が安定
+- **解決**: 手動テーブル作成 + catalogTargets での更新方式
+- **利点**: ETL スクリプトでテーブル名が安定
+
+#### ETL Job データソース方式の変更
+- **問題**: Data Catalog ベースだと、Crawler が実行されないと新しい S3 ファイルが見えない
+- **結果**: S3 に 33 ファイルあっても Data Catalog に 6 パーティションしか登録されていないと 6 件しか処理されない
+- **解決**: S3 から直接読み込む方式に変更（`from_options`）
+- **利点**: Crawler に依存せず、リアルタイムで S3 の全ファイルを処理可能
+
+#### パーティションキー事前定義の検証結果
+- **実験**: Curated テーブルをパーティションキーなしで作成
+- **結果**: Crawler がパーティションキー（year, month, day）を自動検出・追加
+- **結論**: 手動テーブル作成時にパーティションキーを事前定義する必要はない（Crawler が自動検出）
+
+#### 温度フィールドの型推論問題
+- **問題**: SwitchBot API が温度を整数（21）または小数（21.5）で返す
+- **結果**: Glue が `struct<double:double,int:int>` として推論し、直接キャストでエラー
+- **エラー**: `AnalysisException: cannot cast struct<double:double,int:int> to double`
+- **解決**: `coalesce(col("temperature.double"), col("temperature.int").cast("double"))` で両方の型に対応
+- **教訓**: 数値フィールドは型が混在する可能性があるため、Glue のスキーマ推論結果を確認すること
 
 ### スケジューリング
-- **EventBridge Scheduler**: 15分間隔でのLambda関数定期実行
-  - L2コンストラクト（`aws-scheduler`）を使用
-  - `LambdaInvoke`ターゲットでLambda関数を呼び出し
-  - 自動的なIAM権限設定
+- **EventBridge Scheduler**: 15 分間隔での Lambda 関数定期実行
+  - L2 コンストラクト（`aws-scheduler`）を使用
+  - `LambdaInvoke` ターゲットで Lambda 関数を呼び出し
+  - 自動的な IAM 権限設定
 - Glue Crawler: 日次実行
-- Glue ETL Job: Crawlerの後に実行
+- Glue ETL Job: Crawler の後に実行
 
 ### コスト最適化
 - Lambda: 実行時間の最小化
 - S3: ライフサイクルポリシー
 - Athena: パーティション活用
-- Glue: 必要最小限のDPU設定
+- Glue: 必要最小限の DPU 設定
 
 ### データ保持ポリシー
-- Raw データ: 1年間保持
-- Curated データ: 3年間保持
-- ログ: 30日間保持
+- Raw データ: 1 年間保持
+- Curated データ: 3 年間保持
+- ログ: 30 日間保持

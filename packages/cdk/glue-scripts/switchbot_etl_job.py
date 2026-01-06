@@ -9,14 +9,8 @@ from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
-from pyspark.sql import DataFrame
-from pyspark.sql.functions import *
-from pyspark.sql.types import *
-import logging
-
-# Set up logging
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+from awsglue.dynamicframe import DynamicFrame
+from pyspark.sql.functions import col, explode, to_timestamp, date_format, coalesce
 
 def main():
     # Get job parameters
@@ -34,55 +28,64 @@ def main():
     job = Job(glueContext)
     job.init(args['JOB_NAME'], args)
     
-    logger.info(f"Starting ETL job: {args['JOB_NAME']}")
-    logger.info(f"Raw bucket: {args['raw_bucket']}")
-    logger.info(f"Curated bucket: {args['curated_bucket']}")
-    logger.info(f"Database: {args['database_name']}")
+    print(f"Starting ETL job: {args['JOB_NAME']}")
     
     try:
-        # Read data from Glue Data Catalog (Raw data)
-        # Table name is fixed as 'switchbot_raw_data' by manual table creation
-        raw_data_source = glueContext.create_dynamic_frame.from_catalog(
-            database=args['database_name'],
-            table_name="switchbot_raw_data"
+        raw_s3_path = f"s3://{args['raw_bucket']}/"
+        
+        # Read JSON data from Raw S3 Bucket
+        raw_data_source = glueContext.create_dynamic_frame.from_options(
+            connection_type="s3",
+            connection_options={
+                "paths": [raw_s3_path],
+                "recurse": True
+            },
+            format="json",
+            transformation_ctx="raw_data_source"
         )
         
-        logger.info(f"Raw data count: {raw_data_source.count()}")
+        raw_count = raw_data_source.count()
+        print(f"Raw data count: {raw_count}")
         
-        if raw_data_source.count() == 0:
-            logger.warning("No data found in raw data source")
+        if raw_count == 0:
+            print("No data found in raw data source")
             job.commit()
             return
         
-        # Convert to Spark DataFrame for easier manipulation
+        # Convert to Spark DataFrame
         raw_df = raw_data_source.toDF()
         
         # Extract and flatten the deviceStatusData array
-        # The JSON structure contains an array of device status data
         flattened_df = raw_df.select(
-            explode(col("devicestatusdata")).alias("device_data"),
+            explode(col("api_response.body.deviceStatusData")).alias("device_data"),
             col("timestamp").alias("collection_timestamp")
         )
         
-        # Extract fields from the nested structure
+        # Extract fields from nested structure
+        # Note: temperature can be either double or struct<double:double,int:int> depending on data
+        # Use coalesce with try to handle both cases
         processed_df = flattened_df.select(
-            col("device_data.deviceinfo.deviceid").alias("device_id"),
-            col("device_data.deviceinfo.devicename").alias("device_name"),
-            col("device_data.deviceinfo.devicetype").alias("device_type"),
-            col("device_data.deviceinfo.hubdeviceid").alias("hub_device_id"),
-            col("device_data.status.temperature").cast("double").alias("temperature"),
+            col("device_data.deviceInfo.deviceId").alias("device_id"),
+            col("device_data.deviceInfo.deviceName").alias("device_name"),
+            col("device_data.deviceInfo.deviceType").alias("device_type"),
+            col("device_data.deviceInfo.hubDeviceId").alias("hub_device_id"),
+            # Handle temperature - try struct fields first, then direct cast
+            coalesce(
+                col("device_data.status.temperature.double"),
+                col("device_data.status.temperature.int").cast("double"),
+                col("device_data.status.temperature").cast("double")
+            ).alias("temperature"),
             col("device_data.status.humidity").cast("int").alias("humidity"),
             col("device_data.status.battery").cast("int").alias("battery"),
             col("device_data.status.version").alias("device_version"),
             to_timestamp(col("device_data.timestamp")).alias("recorded_at"),
             to_timestamp(col("collection_timestamp")).alias("collection_time"),
-            # Add partition columns for efficient querying
             date_format(to_timestamp(col("device_data.timestamp")), "yyyy").alias("year"),
             date_format(to_timestamp(col("device_data.timestamp")), "MM").alias("month"),
             date_format(to_timestamp(col("device_data.timestamp")), "dd").alias("day")
         )
         
-        # Filter out null or invalid data
+        # Filter out invalid data
         cleaned_df = processed_df.filter(
             col("device_id").isNotNull() &
             col("temperature").isNotNull() &
@@ -90,17 +93,16 @@ def main():
             col("recorded_at").isNotNull()
         )
         
-        logger.info(f"Processed data count: {cleaned_df.count()}")
+        cleaned_count = cleaned_df.count()
+        print(f"Processed records: {cleaned_count}")
         
-        if cleaned_df.count() == 0:
-            logger.warning("No valid data after processing")
+        if cleaned_count == 0:
+            print("No valid data after processing")
             job.commit()
             return
         
-        # Convert back to DynamicFrame for Glue operations
+        # Convert back to DynamicFrame and write to Curated S3 Bucket
         processed_dynamic_frame = DynamicFrame.fromDF(cleaned_df, glueContext, "processed_data")
-        
-        # Write to S3 in Parquet format with partitioning
         output_path = f"s3://{args['curated_bucket']}/curated-data/"
         
         glueContext.write_dynamic_frame.from_options(
@@ -114,21 +116,14 @@ def main():
             transformation_ctx="write_curated_data"
         )
         
-        logger.info(f"Successfully wrote curated data to: {output_path}")
-        
-        # Log summary statistics
-        logger.info("ETL Job Summary:")
-        logger.info(f"- Total records processed: {cleaned_df.count()}")
-        logger.info(f"- Unique devices: {cleaned_df.select('device_id').distinct().count()}")
-        logger.info(f"- Date range: {cleaned_df.agg(min('recorded_at'), max('recorded_at')).collect()[0]}")
+        print(f"Successfully wrote {cleaned_count} records to Parquet")
         
     except Exception as e:
-        logger.error(f"ETL job failed with error: {str(e)}")
+        print(f"ETL job failed: {str(e)}")
         raise e
     
     finally:
         job.commit()
-        logger.info("ETL job completed")
 
 if __name__ == "__main__":
     main()

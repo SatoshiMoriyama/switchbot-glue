@@ -11,8 +11,10 @@
     "editor.defaultFormatter": "biomejs.biome"
   },
   "cSpell.words": [
+    "awsglue",
     "biomejs",
     "Blurrer",
+    "dynamicframe",
     "Kiro",
     "markdownlint",
     "nwiizo",

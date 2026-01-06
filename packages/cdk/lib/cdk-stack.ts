@@ -99,18 +99,11 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
     );
 
     // EventBridge Scheduler for Lambda execution (every 15 minutes)
-    const schedule = new scheduler.Schedule(
-      this,
-      'SwitchBotDataCollectionScheduler',
-      {
-        schedule: scheduler.ScheduleExpression.rate(cdk.Duration.minutes(15)),
-        target: new schedulerTargets.LambdaInvoke(
-          this.dataCollectionLambda,
-          {},
-        ),
-        description: 'Triggers SwitchBot data collection every 15 minutes',
-      },
-    );
+    new scheduler.Schedule(this, 'SwitchBotDataCollectionScheduler', {
+      schedule: scheduler.ScheduleExpression.rate(cdk.Duration.minutes(15)),
+      target: new schedulerTargets.LambdaInvoke(this.dataCollectionLambda, {}),
+      description: 'Triggers SwitchBot data collection every 15 minutes',
+    });
 
     // Glue Database for data catalog
     this.glueDatabase = new glue.CfnDatabase(this, 'SwitchBotGlueDatabase', {
@@ -248,11 +241,46 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
       },
       description: 'ETL job to convert SwitchBot JSON data to Parquet format',
       glueVersion: '4.0',
-      maxRetries: 1,
+      maxRetries: 0,
       timeout: 60, // 60 minutes
       workerType: 'G.1X',
       numberOfWorkers: 2,
     });
+
+    // Curated Data Table with Fixed Name (no partition keys - test if crawler can detect)
+    const curatedDataTable = new glue.CfnTable(
+      this,
+      'SwitchBotCuratedDataTable',
+      {
+        catalogId: this.account,
+        databaseName: 'switchbot_data_catalog',
+        tableInput: {
+          name: 'switchbot_curated_data', // Fixed table name!
+          description: 'SwitchBot curated Parquet data table',
+          tableType: 'EXTERNAL_TABLE',
+          parameters: {
+            classification: 'parquet',
+            compressionType: 'none',
+          },
+          storageDescriptor: {
+            location: `s3://${this.curatedDataBucket.bucketName}/curated-data/`,
+            inputFormat:
+              'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat',
+            outputFormat:
+              'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat',
+            serdeInfo: {
+              serializationLibrary:
+                'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe',
+            },
+            columns: [], // Empty - Crawler will populate
+          },
+          // No partitionKeys - test if crawler can detect them
+        },
+      },
+    );
+
+    // Ensure curated table depends on database
+    curatedDataTable.addDependency(this.glueDatabase);
 
     // Curated Data Crawler for Parquet files in Curated S3 Bucket
     this.curatedDataCrawler = new glue.CfnCrawler(
@@ -262,15 +290,17 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
         role: this.glueCrawlerRole.roleArn,
         databaseName: 'switchbot_data_catalog',
         targets: {
-          s3Targets: [
+          catalogTargets: [
             {
-              path: `s3://${this.curatedDataBucket.bucketName}/curated-data/`,
+              databaseName: 'switchbot_data_catalog',
+              tables: ['switchbot_curated_data'], // Update existing manual table
             },
           ],
         },
         name: 'switchbot-curated-data-crawler',
-        description: 'Crawler for SwitchBot curated Parquet data in S3',
-        tablePrefix: 'curated_switchbot_',
+        description:
+          'Crawler to update existing switchbot_curated_data table schema',
+        tablePrefix: '',
         schedule: {
           scheduleExpression: 'cron(0 3 * * ? *)', // Daily at 3 AM UTC (after ETL job)
         },
@@ -291,8 +321,8 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
       },
     );
 
-    // Ensure curated crawler depends on database
-    this.curatedDataCrawler.addDependency(this.glueDatabase);
+    // Ensure curated crawler depends on the manual table
+    this.curatedDataCrawler.addDependency(curatedDataTable);
 
     // Output important values
     new cdk.CfnOutput(this, 'RawDataBucketName', {
