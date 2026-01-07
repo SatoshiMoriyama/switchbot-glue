@@ -7,7 +7,7 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "deploy-prep": "pnpm run build && cp -r node_modules dist/ || echo 'node_modules copy completed'"
+    "deploy-prep": "pnpm run build && mkdir -p dist && cp -r node_modules dist/"
   },
   "keywords": [
     "switchbot",

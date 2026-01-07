@@ -6,8 +6,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "deploy": "cdk deploy --require-approval never",
-    "deploy:with-approval": "cdk deploy",
+    "deploy": "cd ../api && pnpm run deploy-prep && cd ../cdk && cdk deploy --require-approval never",
+    "deploy:with-approval": "cd ../api && pnpm run deploy-prep && cd ../cdk && cdk deploy",
     "destroy": "cdk destroy",
     "diff": "cdk diff",
     "synth": "cdk synth",
