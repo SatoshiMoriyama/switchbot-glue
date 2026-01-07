@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
-    "test": "jest"
+    "test": "jest",
+    "deploy-prep": "pnpm run build && cp -r node_modules dist/ || echo 'node_modules copy completed'"
   },
   "keywords": [
     "switchbot",
