@@ -7,7 +7,7 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "deploy-prep": "pnpm run build && mkdir -p dist && cp -r node_modules dist/"
+    "deploy-prep": "pnpm install --prod && pnpm run build && mkdir -p dist && cp -r node_modules dist/ && rm -rf dist/node_modules/@aws-sdk"
   },
   "keywords": [
     "switchbot",
