@@ -3,6 +3,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as glue from 'aws-cdk-lib/aws-glue';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as scheduler from 'aws-cdk-lib/aws-scheduler';
@@ -23,11 +24,10 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
   // S3 Buckets
   public readonly rawDataBucket: s3.Bucket;
   public readonly curatedDataBucket: s3.Bucket;
-  public readonly scriptsBucket: s3.Bucket;
 
   // Lambda
   public readonly lambdaExecutionRole: iam.Role;
-  public readonly dataCollectionLambda: lambda.Function;
+  public readonly dataCollectionLambda: nodejs.NodejsFunction;
 
   // Glue
   public readonly glueDatabase: glue.CfnDatabase;
@@ -60,10 +60,6 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    this.scriptsBucket = new s3.Bucket(this, 'SwitchBotScriptsBucket', {
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
     // =========================================================================
     // 2. Lambda - Data Collection Layer
     // =========================================================================
@@ -87,13 +83,13 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    this.dataCollectionLambda = new lambda.Function(
+    this.dataCollectionLambda = new nodejs.NodejsFunction(
       this,
       'SwitchBotDataCollectionFunction',
       {
         runtime: lambda.Runtime.NODEJS_20_X,
-        handler: 'index.handler',
-        code: lambda.Code.fromAsset(path.join(__dirname, '../../api/dist')),
+        entry: path.join(__dirname, '../../api/src/index.ts'),
+        handler: 'handler',
         role: this.lambdaExecutionRole,
         timeout: cdk.Duration.minutes(5),
         memorySize: 256,
@@ -258,7 +254,6 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
     });
     this.rawDataBucket.grantRead(this.glueJobRole);
     this.curatedDataBucket.grantReadWrite(this.glueJobRole);
-    this.scriptsBucket.grantRead(this.glueJobRole);
     etlScriptAsset.grantRead(this.glueJobRole);
 
     this.etlJob = new glue.CfnJob(this, 'SwitchBotETLJob', {
