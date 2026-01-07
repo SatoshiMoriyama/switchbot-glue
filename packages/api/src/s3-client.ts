@@ -1,4 +1,5 @@
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { toZonedTime } from 'date-fns-tz';
 
 /**
  * S3 Data Storage interface
@@ -44,13 +45,13 @@ export class S3DataStorage {
   private generateS3Key(timestamp: string): string {
     const date = new Date(timestamp);
 
-    // Convert UTC to JST (UTC+9) - Updated for JST partitioning
-    const jstDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+    // Convert UTC to JST using proper timezone handling
+    const jstDate = toZonedTime(date, 'Asia/Tokyo');
 
-    const year = jstDate.getUTCFullYear();
-    const month = String(jstDate.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(jstDate.getUTCDate()).padStart(2, '0');
-    const hour = String(jstDate.getUTCHours()).padStart(2, '0');
+    const year = jstDate.getFullYear();
+    const month = String(jstDate.getMonth() + 1).padStart(2, '0');
+    const day = String(jstDate.getDate()).padStart(2, '0');
+    const hour = String(jstDate.getHours()).padStart(2, '0');
 
     const timestampForFile = timestamp.replace(/[:.]/g, '-');
     return `year=${year}/month=${month}/day=${day}/hour=${hour}/switchbot-raw-data-${timestampForFile}.json`;
