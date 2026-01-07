@@ -82,7 +82,7 @@ export class S3DataStorage {
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: s3Key,
-        Body: JSON.stringify(rawData), // コンパクトなJSON形式（インデントなし）
+        Body: JSON.stringify(rawData), // Compact JSON format (no indentation)
         ContentType: 'application/json',
         Metadata: {
           'collection-time': timestamp,

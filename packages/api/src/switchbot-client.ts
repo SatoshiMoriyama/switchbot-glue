@@ -72,7 +72,7 @@ export class SwitchBotClient {
    */
   private generateAuthHeaders(): Record<string, string> {
     const t = Date.now();
-    const nonce = 'requestID';
+    const nonce = crypto.randomUUID();
     const data = this.token + t + nonce;
     const sign = crypto
       .createHmac('sha256', this.secret)

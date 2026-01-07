@@ -9,7 +9,7 @@ fileMatchPattern: 'blog_contents/*.md'
 
 初心者向け: AWS Glue 初心者、データパイプライン入門者。
 
-d## 2. 記事の目的・ゴール
+## 2. 記事の目的・ゴール
 
 学習目的: AWS Glue の使い方を学ぶ。
 
