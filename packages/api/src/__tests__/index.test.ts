@@ -88,7 +88,7 @@ describe('Lambda Handler', () => {
       message:
         'SwitchBot temperature/humidity data collection completed successfully',
       requestId: 'test-request-id',
-      temperatureHumidityDevicesCount: 0, // Mock returns empty devices array
+      temperatureHumidityDevicesCount: 0, // Mock returns only a Humidifier (no temperature/humidity sensors), so count is 0
     });
 
     // Verify SwitchBot client was called
