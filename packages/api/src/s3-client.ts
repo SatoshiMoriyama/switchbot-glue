@@ -37,16 +37,20 @@ export class S3DataStorage {
   }
 
   /**
-   * Generate S3 key with timestamp and partitioning
+   * Generate S3 key with timestamp and partitioning (JST timezone)
    * @param timestamp - ISO timestamp string
-   * @returns S3 key path with partitioning
+   * @returns S3 key path with partitioning based on JST
    */
   private generateS3Key(timestamp: string): string {
     const date = new Date(timestamp);
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hour = String(date.getUTCHours()).padStart(2, '0');
+
+    // Convert UTC to JST (UTC+9) - Updated for JST partitioning
+    const jstDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+
+    const year = jstDate.getUTCFullYear();
+    const month = String(jstDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(jstDate.getUTCDate()).padStart(2, '0');
+    const hour = String(jstDate.getUTCHours()).padStart(2, '0');
 
     const timestampForFile = timestamp.replace(/[:.]/g, '-');
     return `year=${year}/month=${month}/day=${day}/hour=${hour}/switchbot-raw-data-${timestampForFile}.json`;

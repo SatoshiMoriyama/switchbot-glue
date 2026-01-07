@@ -378,8 +378,50 @@ GROUP BY device_name;
 - **問題**: SwitchBot API が温度を整数（21）または小数（21.5）で返す
 - **結果**: Glue が `struct<double:double,int:int>` として推論し、直接キャストでエラー
 - **エラー**: `AnalysisException: cannot cast struct<double:double,int:int> to double`
-- **解決**: `coalesce(col("temperature.double"), col("temperature.int").cast("double"))` で両方の型に対応
-- **教訓**: 数値フィールドは型が混在する可能性があるため、Glue のスキーマ推論結果を確認すること
+- **初期解決試行**: 3段階フォールバックの `coalesce` で対応
+  ```python
+  coalesce(
+      col("device_data.status.temperature.double"),      # struct の double フィールド
+      col("device_data.status.temperature.int").cast("double"),  # struct の int フィールド
+      col("device_data.status.temperature").cast("double")       # 直接 double の場合
+  )
+  ```
+- **追加問題**: Job Bookmark 有効時は新規ファイルのみ処理され、型が単純な `double` になる場合がある
+- **エラー**: `AnalysisException: Can't extract value from temperature: need struct type but got double`
+- **根本原因**: Spark は `coalesce` の全ての式をパース時に評価するため、型が異なると最初の式でエラー
+- **最終解決**: DynamicFrame の `resolveChoice()` でスキーマレベル解決
+  ```python
+  resolved_frame = raw_data_source.resolveChoice(specs=[
+      ('api_response.body.deviceStatusData.status.temperature', 'cast:double')
+  ])
+  ```
+- **教訓**: 
+  - 数値フィールドは型が混在する可能性があるため、Glue のスキーマ推論結果を確認すること
+  - Job Bookmark の有無で処理対象ファイルが変わり、スキーマ推論結果も変わる可能性がある
+  - Spark の式レベル解決より、DynamicFrame のスキーマレベル解決が確実
+
+#### JST（日本標準時）対応
+- **問題**: UTC時刻でパーティション作成により、日本の利用者にとって直感的でない
+- **影響範囲**: 
+  - Lambda関数: S3パーティション作成時
+  - ETL Job: Curatedデータのパーティション作成時
+- **Lambda関数の修正**:
+  ```typescript
+  // Convert UTC to JST (UTC+9)
+  const jstDate = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  ```
+- **ETL Jobの修正**:
+  ```python
+  # Convert UTC to JST (UTC+9) for partitioning
+  from_utc_timestamp(to_timestamp(col("device_data.timestamp")), "Asia/Tokyo")
+  ```
+- **設計方針**:
+  - **パーティション**: JST時刻ベース（日本の利用者にとって直感的）
+  - **データ内容**: UTC時刻保持（国際標準、タイムゾーン情報保持）
+- **結果**: 
+  - UTC 03:27 → JST 12:27
+  - パーティション: `year=2026/month=01/day=07/hour=12` (JST基準)
+  - データ内容: `2026-01-07T03:27:02.058Z` (UTC保持)
 
 ### スケジューリング
 - **EventBridge Scheduler**: 15 分間隔での Lambda 関数定期実行

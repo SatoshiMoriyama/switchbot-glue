@@ -10,7 +10,7 @@ from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
 from awsglue.dynamicframe import DynamicFrame
-from pyspark.sql.functions import col, explode, to_timestamp, date_format, coalesce
+from pyspark.sql.functions import col, explode, to_timestamp, date_format, coalesce, from_utc_timestamp, when
 
 def main():
     # Get job parameters
@@ -55,6 +55,15 @@ def main():
         # Convert to Spark DataFrame
         raw_df = raw_data_source.toDF()
         
+        # Resolve choice types (struct vs primitive) using DynamicFrame
+        # This handles the temperature field type ambiguity at schema level
+        resolved_frame = raw_data_source.resolveChoice(specs=[
+            ('api_response.body.deviceStatusData.status.temperature', 'cast:double')
+        ])
+        
+        # Convert resolved frame back to DataFrame
+        raw_df = resolved_frame.toDF()
+        
         # Extract and flatten the deviceStatusData array
         flattened_df = raw_df.select(
             explode(col("api_response.body.deviceStatusData")).alias("device_data"),
@@ -69,20 +78,18 @@ def main():
             col("device_data.deviceInfo.deviceName").alias("device_name"),
             col("device_data.deviceInfo.deviceType").alias("device_type"),
             col("device_data.deviceInfo.hubDeviceId").alias("hub_device_id"),
-            # Handle temperature - try struct fields first, then direct cast
-            coalesce(
-                col("device_data.status.temperature.double"),
-                col("device_data.status.temperature.int").cast("double"),
-                col("device_data.status.temperature").cast("double")
-            ).alias("temperature"),
+            # Temperature field is now resolved to double type
+            col("device_data.status.temperature").cast("double").alias("temperature"),
             col("device_data.status.humidity").cast("int").alias("humidity"),
             col("device_data.status.battery").cast("int").alias("battery"),
             col("device_data.status.version").alias("device_version"),
             to_timestamp(col("device_data.timestamp")).alias("recorded_at"),
             to_timestamp(col("collection_timestamp")).alias("collection_time"),
-            date_format(to_timestamp(col("device_data.timestamp")), "yyyy").alias("year"),
-            date_format(to_timestamp(col("device_data.timestamp")), "MM").alias("month"),
-            date_format(to_timestamp(col("device_data.timestamp")), "dd").alias("day")
+            # Convert UTC to JST (UTC+9) for partitioning
+            from_utc_timestamp(to_timestamp(col("device_data.timestamp")), "Asia/Tokyo").alias("recorded_at_jst"),
+            date_format(from_utc_timestamp(to_timestamp(col("device_data.timestamp")), "Asia/Tokyo"), "yyyy").alias("year"),
+            date_format(from_utc_timestamp(to_timestamp(col("device_data.timestamp")), "Asia/Tokyo"), "MM").alias("month"),
+            date_format(from_utc_timestamp(to_timestamp(col("device_data.timestamp")), "Asia/Tokyo"), "dd").alias("day")
         )
         
         # Filter out invalid data
