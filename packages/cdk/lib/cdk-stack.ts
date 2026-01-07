@@ -80,7 +80,6 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
       },
     );
     this.rawDataBucket.grantReadWrite(this.lambdaExecutionRole);
-    this.curatedDataBucket.grantReadWrite(this.lambdaExecutionRole);
 
     const lambdaLogGroup = new logs.LogGroup(this, 'SwitchBotLambdaLogGroup', {
       logGroupName: '/aws/lambda/SwitchBotDataCollectionFunction',
