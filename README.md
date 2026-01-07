@@ -199,7 +199,7 @@ pnpm code:check
 pnpm code:fix
 ```
 
-## セットアップ
+## 文章校正・リント設定
 
 ```bash
 # 依存関係のインストール
