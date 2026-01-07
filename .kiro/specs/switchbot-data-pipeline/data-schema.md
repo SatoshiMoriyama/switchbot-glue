@@ -63,7 +63,7 @@ SwitchBot 温湿度データパイプラインで使用されるデータ構造�
 
 ```json
 {
-  "timestamp": "2026-01-06T06:10:50.831Z",
+  "timestamp": "{ISO8601-timestamp}",
   "api_response": {
     "statusCode": 100,
     "body": {
@@ -84,20 +84,20 @@ SwitchBot 温湿度データパイプラインで使用されるデータ構造�
             "deviceType": "MeterPro", 
             "hubDeviceId": "000000000000"
           },
-          "timestamp": "2026-01-06T06:10:50.830Z"
+          "timestamp": "{ISO8601-timestamp}"
         }
       ],
-      "timestamp": "2026-01-06T06:10:50.830Z",
+      "timestamp": "{ISO8601-timestamp}",
       "summary": {
         "totalDevicesScanned": 3,
         "temperatureHumidityDevicesFound": 1,
-        "collectionTime": "2026-01-06T06:10:50.830Z"
+        "collectionTime": "{ISO8601-timestamp}"
       }
     },
     "message": "success"
   },
   "metadata": {
-    "collection_time": "2026-01-06T06:10:50.831Z",
+    "collection_time": "{ISO8601-timestamp}",
     "api_version": "v1.1",
     "lambda_request_id": "6b2ea348-48db-4a2c-b57e-ccc6e49f1a19"
   }
@@ -214,7 +214,7 @@ year=2026/month=01/day=06/hour=05/
 
 ### パーティション構造
 ```
-collection_date=2026-01-06/collection_hour=5/
+collection_date={YYYY-MM-DD}/collection_hour={H}/
 ```
 
 ### データ品質制約

@@ -102,11 +102,11 @@ SwitchBot 温湿度計からデータを収集し、AWS Glue を使用してデ�
 #### Raw Bucket構造
 ```
 s3://bucket-name/
-├── year=2026/
-│   ├── month=01/
-│   │   ├── day=06/
-│   │   │   ├── hour=05/
-│   │   │   │   └── switchbot-raw-data-2026-01-06T05-19-11-223Z.json
+├── year={YYYY}/
+│   ├── month={MM}/
+│   │   ├── day={DD}/
+│   │   │   ├── hour={HH}/
+│   │   │   │   └── switchbot-raw-data-{ISO8601-timestamp}.json
 ```
 
 #### ファイル命名規則
