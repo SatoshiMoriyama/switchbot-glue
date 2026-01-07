@@ -93,7 +93,21 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
       {
         runtime: lambda.Runtime.NODEJS_20_X,
         handler: 'index.handler',
-        code: lambda.Code.fromAsset(path.join(__dirname, '../../api/dist')),
+        code: lambda.Code.fromAsset(path.join(__dirname, '../../api'), {
+          bundling: {
+            image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+            command: [
+              'bash',
+              '-c',
+              [
+                'cp -r /asset-input/* /asset-output/',
+                'cd /asset-output',
+                'npm install --production',
+                'npm run build',
+              ].join(' && '),
+            ],
+          },
+        }),
         role: this.lambdaExecutionRole,
         timeout: cdk.Duration.minutes(5),
         memorySize: 256,
