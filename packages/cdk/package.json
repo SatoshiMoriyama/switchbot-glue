@@ -6,8 +6,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "deploy": "cd ../api && pnpm run deploy-prep && cd ../cdk && cdk deploy --require-approval never",
-    "deploy:with-approval": "cd ../api && pnpm run deploy-prep && cd ../cdk && cdk deploy",
+    "deploy": "cdk deploy --require-approval never",
+    "deploy:with-approval": "cdk deploy",
     "destroy": "cdk destroy",
     "diff": "cdk diff",
     "synth": "cdk synth",
@@ -20,6 +20,7 @@
     "@types/jest": "^29.5.14",
     "@types/node": "^24.10.1",
     "aws-cdk": "2.1100.3",
+    "esbuild": "^0.27.2",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
