@@ -85,11 +85,10 @@ describe('Lambda Handler', () => {
 
     expect(result.statusCode).toBe(200);
     expect(JSON.parse(result.body)).toMatchObject({
-      message: 'SwitchBot data collection completed successfully',
+      message:
+        'SwitchBot temperature/humidity data collection completed successfully',
       requestId: 'test-request-id',
-      apiStatus: 100,
-      deviceCount: 1,
-      infraredRemoteCount: 0,
+      temperatureHumidityDevicesCount: 0, // Mock returns empty devices array
     });
 
     // Verify SwitchBot client was called
