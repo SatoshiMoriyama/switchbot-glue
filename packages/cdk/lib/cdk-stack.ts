@@ -24,7 +24,6 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
   // S3 Buckets
   public readonly rawDataBucket: s3.Bucket;
   public readonly curatedDataBucket: s3.Bucket;
-  public readonly scriptsBucket: s3.Bucket;
 
   // Lambda
   public readonly lambdaExecutionRole: iam.Role;
@@ -58,10 +57,6 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
     });
 
     this.curatedDataBucket = new s3.Bucket(this, 'SwitchBotCuratedDataBucket', {
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
-    this.scriptsBucket = new s3.Bucket(this, 'SwitchBotScriptsBucket', {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -259,7 +254,6 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
     });
     this.rawDataBucket.grantRead(this.glueJobRole);
     this.curatedDataBucket.grantReadWrite(this.glueJobRole);
-    this.scriptsBucket.grantRead(this.glueJobRole);
     etlScriptAsset.grantRead(this.glueJobRole);
 
     this.etlJob = new glue.CfnJob(this, 'SwitchBotETLJob', {
