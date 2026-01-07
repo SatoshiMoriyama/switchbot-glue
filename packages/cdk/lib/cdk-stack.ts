@@ -10,39 +10,63 @@ import * as schedulerTargets from 'aws-cdk-lib/aws-scheduler-targets';
 import type { Construct } from 'constructs';
 import * as dotenv from 'dotenv';
 
-// Load environment variables from .env file
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
 
+// =============================================================================
+// Constants
+// =============================================================================
+const GLUE_DATABASE_NAME = 'switchbot_data_catalog';
+const RAW_TABLE_NAME = 'switchbot_raw_data';
+const CURATED_TABLE_NAME = 'switchbot_curated_data';
+
 export class SwitchBotDataPipelineStack extends cdk.Stack {
+  // S3 Buckets
   public readonly rawDataBucket: s3.Bucket;
   public readonly curatedDataBucket: s3.Bucket;
   public readonly scriptsBucket: s3.Bucket;
+
+  // Lambda
   public readonly lambdaExecutionRole: iam.Role;
   public readonly dataCollectionLambda: lambda.Function;
+
+  // Glue
   public readonly glueDatabase: glue.CfnDatabase;
   public readonly glueCrawlerRole: iam.Role;
-  public readonly rawDataCrawler: glue.CfnCrawler;
   public readonly glueJobRole: iam.Role;
-  public readonly etlJob: glue.CfnJob;
+  public readonly rawDataCrawler: glue.CfnCrawler;
   public readonly curatedDataCrawler: glue.CfnCrawler;
+  public readonly etlJob: glue.CfnJob;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // S3 Buckets for data pipeline
+    // Validate environment variables
+    const switchbotToken = process.env.SWITCHBOT_TOKEN;
+    const switchbotSecret = process.env.SWITCHBOT_SECRET;
+    if (!switchbotToken || !switchbotSecret) {
+      throw new Error(
+        'SWITCHBOT_TOKEN and SWITCHBOT_SECRET must be set in .env file',
+      );
+    }
+
+    // =========================================================================
+    // 1. S3 Buckets - Data Storage Layer
+    // =========================================================================
     this.rawDataBucket = new s3.Bucket(this, 'SwitchBotRawDataBucket', {
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
     this.curatedDataBucket = new s3.Bucket(this, 'SwitchBotCuratedDataBucket', {
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
     this.scriptsBucket = new s3.Bucket(this, 'SwitchBotScriptsBucket', {
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // For development
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // IAM Role for Lambda function execution
+    // =========================================================================
+    // 2. Lambda - Data Collection Layer
+    // =========================================================================
     this.lambdaExecutionRole = new iam.Role(
       this,
       'SwitchBotLambdaExecutionRole',
@@ -55,29 +79,15 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
         ],
       },
     );
-
-    // Grant S3 permissions using CDK's high-level methods
     this.rawDataBucket.grantReadWrite(this.lambdaExecutionRole);
     this.curatedDataBucket.grantReadWrite(this.lambdaExecutionRole);
 
-    // Validate required environment variables
-    const switchbotToken = process.env.SWITCHBOT_TOKEN;
-    const switchbotSecret = process.env.SWITCHBOT_SECRET;
-
-    if (!switchbotToken || !switchbotSecret) {
-      throw new Error(
-        'SWITCHBOT_TOKEN and SWITCHBOT_SECRET must be set in .env file',
-      );
-    }
-
-    // CloudWatch Log Group for Lambda function
     const lambdaLogGroup = new logs.LogGroup(this, 'SwitchBotLambdaLogGroup', {
-      logGroupName: `/aws/lambda/SwitchBotDataCollectionFunction`,
+      logGroupName: '/aws/lambda/SwitchBotDataCollectionFunction',
       retention: logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // Lambda function for SwitchBot data collection
     this.dataCollectionLambda = new lambda.Function(
       this,
       'SwitchBotDataCollectionFunction',
@@ -98,35 +108,31 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
       },
     );
 
-    // EventBridge Scheduler for Lambda execution (every 15 minutes)
     new scheduler.Schedule(this, 'SwitchBotDataCollectionScheduler', {
       schedule: scheduler.ScheduleExpression.rate(cdk.Duration.minutes(15)),
       target: new schedulerTargets.LambdaInvoke(this.dataCollectionLambda, {}),
       description: 'Triggers SwitchBot data collection every 15 minutes',
     });
 
-    // Glue Database for data catalog
+    // =========================================================================
+    // 3. Glue Database & Tables - Data Catalog Layer
+    // =========================================================================
     this.glueDatabase = new glue.CfnDatabase(this, 'SwitchBotGlueDatabase', {
       catalogId: this.account,
       databaseInput: {
-        name: 'switchbot_data_catalog',
-        description:
-          'Database for SwitchBot temperature and humidity data catalog',
+        name: GLUE_DATABASE_NAME,
+        description: 'Database for SwitchBot temperature and humidity data',
       },
     });
 
-    // Manual Table Creation with Fixed Name
     const rawDataTable = new glue.CfnTable(this, 'SwitchBotRawDataTable', {
       catalogId: this.account,
-      databaseName: 'switchbot_data_catalog',
+      databaseName: GLUE_DATABASE_NAME,
       tableInput: {
-        name: 'switchbot_raw_data', // Fixed table name!
+        name: RAW_TABLE_NAME,
         description: 'SwitchBot raw JSON data table',
         tableType: 'EXTERNAL_TABLE',
-        parameters: {
-          classification: 'json', // Add classification parameter
-          compressionType: 'none', // Add compressionType parameter
-        },
+        parameters: { classification: 'json', compressionType: 'none' },
         storageDescriptor: {
           location: `s3://${this.rawDataBucket.bucketName}/`,
           inputFormat: 'org.apache.hadoop.mapred.TextInputFormat',
@@ -135,21 +141,43 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
           serdeInfo: {
             serializationLibrary: 'org.openx.data.jsonserde.JsonSerDe',
           },
-          columns: [], // Empty - Crawler will populate
+          columns: [],
         },
-        partitionKeys: [
-          { name: 'year', type: 'string' },
-          { name: 'month', type: 'string' },
-          { name: 'day', type: 'string' },
-          { name: 'hour', type: 'string' },
-        ],
       },
     });
-
-    // Ensure table depends on database
     rawDataTable.addDependency(this.glueDatabase);
 
-    // IAM Role for Glue Crawler
+    const curatedDataTable = new glue.CfnTable(
+      this,
+      'SwitchBotCuratedDataTable',
+      {
+        catalogId: this.account,
+        databaseName: GLUE_DATABASE_NAME,
+        tableInput: {
+          name: CURATED_TABLE_NAME,
+          description: 'SwitchBot curated Parquet data table',
+          tableType: 'EXTERNAL_TABLE',
+          parameters: { classification: 'parquet', compressionType: 'none' },
+          storageDescriptor: {
+            location: `s3://${this.curatedDataBucket.bucketName}/curated-data/`,
+            inputFormat:
+              'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat',
+            outputFormat:
+              'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat',
+            serdeInfo: {
+              serializationLibrary:
+                'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe',
+            },
+            columns: [],
+          },
+        },
+      },
+    );
+    curatedDataTable.addDependency(this.glueDatabase);
+
+    // =========================================================================
+    // 4. Glue Crawlers - Schema Discovery Layer
+    // =========================================================================
     this.glueCrawlerRole = new iam.Role(this, 'SwitchBotGlueCrawlerRole', {
       assumedBy: new iam.ServicePrincipal('glue.amazonaws.com'),
       managedPolicies: [
@@ -158,54 +186,69 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
         ),
       ],
     });
-
-    // Grant S3 permissions to Glue Crawler
     this.rawDataBucket.grantRead(this.glueCrawlerRole);
     this.curatedDataBucket.grantRead(this.glueCrawlerRole);
 
-    // Raw Data Crawler - Update existing table schema
+    const crawlerConfig = JSON.stringify({
+      Version: 1.0,
+      CrawlerOutput: {
+        Partitions: { AddOrUpdateBehavior: 'InheritFromTable' },
+        Tables: { AddOrUpdateBehavior: 'MergeNewColumns' },
+      },
+      Grouping: { TableGroupingPolicy: 'CombineCompatibleSchemas' },
+    });
+
     this.rawDataCrawler = new glue.CfnCrawler(this, 'SwitchBotRawDataCrawler', {
       role: this.glueCrawlerRole.roleArn,
-      databaseName: 'switchbot_data_catalog',
+      databaseName: GLUE_DATABASE_NAME,
       targets: {
         catalogTargets: [
-          {
-            databaseName: 'switchbot_data_catalog',
-            tables: ['switchbot_raw_data'],
-          },
+          { databaseName: GLUE_DATABASE_NAME, tables: [RAW_TABLE_NAME] },
         ],
       },
       name: 'switchbot-raw-data-crawler',
-      description: 'Crawler to update existing switchbot_raw_data table schema',
+      description: 'Crawler to update switchbot_raw_data table schema',
       tablePrefix: '',
-      schedule: {
-        scheduleExpression: 'cron(0 2 * * ? *)', // Daily at 2 AM UTC
-      },
+      schedule: { scheduleExpression: 'cron(0 2 * * ? *)' },
       schemaChangePolicy: {
         updateBehavior: 'UPDATE_IN_DATABASE',
         deleteBehavior: 'LOG',
       },
-      configuration: JSON.stringify({
-        Version: 1.0,
-        CrawlerOutput: {
-          Partitions: { AddOrUpdateBehavior: 'InheritFromTable' },
-          Tables: { AddOrUpdateBehavior: 'MergeNewColumns' },
-        },
-        Grouping: {
-          TableGroupingPolicy: 'CombineCompatibleSchemas',
-        },
-      }),
+      configuration: crawlerConfig,
     });
-
-    // Ensure crawler depends on the manual table
     this.rawDataCrawler.addDependency(rawDataTable);
 
-    // Upload ETL script to S3
+    this.curatedDataCrawler = new glue.CfnCrawler(
+      this,
+      'SwitchBotCuratedDataCrawler',
+      {
+        role: this.glueCrawlerRole.roleArn,
+        databaseName: GLUE_DATABASE_NAME,
+        targets: {
+          catalogTargets: [
+            { databaseName: GLUE_DATABASE_NAME, tables: [CURATED_TABLE_NAME] },
+          ],
+        },
+        name: 'switchbot-curated-data-crawler',
+        description: 'Crawler to update switchbot_curated_data table schema',
+        tablePrefix: '',
+        schedule: { scheduleExpression: 'cron(0 3 * * ? *)' },
+        schemaChangePolicy: {
+          updateBehavior: 'UPDATE_IN_DATABASE',
+          deleteBehavior: 'LOG',
+        },
+        configuration: crawlerConfig,
+      },
+    );
+    this.curatedDataCrawler.addDependency(curatedDataTable);
+
+    // =========================================================================
+    // 5. Glue ETL Job - Data Transformation Layer
+    // =========================================================================
     const etlScriptAsset = new cdk.aws_s3_assets.Asset(this, 'ETLScriptAsset', {
       path: path.join(__dirname, '../glue-scripts/switchbot_etl_job.py'),
     });
 
-    // IAM Role for Glue ETL Job
     this.glueJobRole = new iam.Role(this, 'SwitchBotGlueJobRole', {
       assumedBy: new iam.ServicePrincipal('glue.amazonaws.com'),
       managedPolicies: [
@@ -214,14 +257,11 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
         ),
       ],
     });
-
-    // Grant S3 permissions to Glue Job
     this.rawDataBucket.grantRead(this.glueJobRole);
     this.curatedDataBucket.grantReadWrite(this.glueJobRole);
     this.scriptsBucket.grantRead(this.glueJobRole);
     etlScriptAsset.grantRead(this.glueJobRole);
 
-    // Glue ETL Job
     this.etlJob = new glue.CfnJob(this, 'SwitchBotETLJob', {
       name: 'switchbot-etl-job',
       role: this.glueJobRole.roleArn,
@@ -237,137 +277,42 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
         '--enable-continuous-cloudwatch-log': 'true',
         '--raw_bucket': this.rawDataBucket.bucketName,
         '--curated_bucket': this.curatedDataBucket.bucketName,
-        '--database_name': 'switchbot_data_catalog',
+        '--database_name': GLUE_DATABASE_NAME,
       },
       description: 'ETL job to convert SwitchBot JSON data to Parquet format',
       glueVersion: '4.0',
       maxRetries: 0,
-      timeout: 60, // 60 minutes
+      timeout: 60,
       workerType: 'G.1X',
       numberOfWorkers: 2,
     });
 
-    // Curated Data Table with Fixed Name (no partition keys - test if crawler can detect)
-    const curatedDataTable = new glue.CfnTable(
-      this,
-      'SwitchBotCuratedDataTable',
-      {
-        catalogId: this.account,
-        databaseName: 'switchbot_data_catalog',
-        tableInput: {
-          name: 'switchbot_curated_data', // Fixed table name!
-          description: 'SwitchBot curated Parquet data table',
-          tableType: 'EXTERNAL_TABLE',
-          parameters: {
-            classification: 'parquet',
-            compressionType: 'none',
-          },
-          storageDescriptor: {
-            location: `s3://${this.curatedDataBucket.bucketName}/curated-data/`,
-            inputFormat:
-              'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat',
-            outputFormat:
-              'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat',
-            serdeInfo: {
-              serializationLibrary:
-                'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe',
-            },
-            columns: [], // Empty - Crawler will populate
-          },
-          // No partitionKeys - test if crawler can detect them
-        },
-      },
-    );
-
-    // Ensure curated table depends on database
-    curatedDataTable.addDependency(this.glueDatabase);
-
-    // Curated Data Crawler for Parquet files in Curated S3 Bucket
-    this.curatedDataCrawler = new glue.CfnCrawler(
-      this,
-      'SwitchBotCuratedDataCrawler',
-      {
-        role: this.glueCrawlerRole.roleArn,
-        databaseName: 'switchbot_data_catalog',
-        targets: {
-          catalogTargets: [
-            {
-              databaseName: 'switchbot_data_catalog',
-              tables: ['switchbot_curated_data'], // Update existing manual table
-            },
-          ],
-        },
-        name: 'switchbot-curated-data-crawler',
-        description:
-          'Crawler to update existing switchbot_curated_data table schema',
-        tablePrefix: '',
-        schedule: {
-          scheduleExpression: 'cron(0 3 * * ? *)', // Daily at 3 AM UTC (after ETL job)
-        },
-        schemaChangePolicy: {
-          updateBehavior: 'UPDATE_IN_DATABASE',
-          deleteBehavior: 'LOG',
-        },
-        configuration: JSON.stringify({
-          Version: 1.0,
-          CrawlerOutput: {
-            Partitions: { AddOrUpdateBehavior: 'InheritFromTable' },
-            Tables: { AddOrUpdateBehavior: 'MergeNewColumns' },
-          },
-          Grouping: {
-            TableGroupingPolicy: 'CombineCompatibleSchemas',
-          },
-        }),
-      },
-    );
-
-    // Ensure curated crawler depends on the manual table
-    this.curatedDataCrawler.addDependency(curatedDataTable);
-
-    // Output important values
+    // =========================================================================
+    // 6. Outputs
+    // =========================================================================
     new cdk.CfnOutput(this, 'RawDataBucketName', {
       value: this.rawDataBucket.bucketName,
-      description: 'Name of the S3 bucket for raw data',
     });
-
     new cdk.CfnOutput(this, 'CuratedDataBucketName', {
       value: this.curatedDataBucket.bucketName,
-      description: 'Name of the S3 bucket for curated data',
     });
-
     new cdk.CfnOutput(this, 'LambdaFunctionName', {
       value: this.dataCollectionLambda.functionName,
-      description: 'Name of the data collection Lambda function',
     });
-
     new cdk.CfnOutput(this, 'LambdaFunctionArn', {
       value: this.dataCollectionLambda.functionArn,
-      description: 'ARN of the data collection Lambda function',
     });
-
-    new cdk.CfnOutput(this, 'ScheduleName', {
-      value: 'SwitchBotDataCollectionScheduler',
-      description: 'Name of the EventBridge Scheduler for scheduled execution',
-    });
-
     new cdk.CfnOutput(this, 'GlueDatabaseName', {
-      value: 'switchbot_data_catalog',
-      description: 'Name of the Glue Database for data catalog',
+      value: GLUE_DATABASE_NAME,
     });
-
     new cdk.CfnOutput(this, 'RawDataCrawlerName', {
       value: this.rawDataCrawler.name || 'switchbot-raw-data-crawler',
-      description: 'Name of the Glue Crawler for raw data',
     });
-
-    new cdk.CfnOutput(this, 'ETLJobName', {
-      value: this.etlJob.name || 'switchbot-etl-job',
-      description: 'Name of the Glue ETL Job',
-    });
-
     new cdk.CfnOutput(this, 'CuratedDataCrawlerName', {
       value: this.curatedDataCrawler.name || 'switchbot-curated-data-crawler',
-      description: 'Name of the Glue Crawler for curated data',
+    });
+    new cdk.CfnOutput(this, 'ETLJobName', {
+      value: this.etlJob.name || 'switchbot-etl-job',
     });
   }
 }
