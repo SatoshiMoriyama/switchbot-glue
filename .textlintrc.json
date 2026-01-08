@@ -8,7 +8,8 @@
         "max": 3
       },
       "difficult-word": false,
-      "no-exclamation-question-mark": false
+      "no-exclamation-question-mark": false,
+      "no-mix-dearu-desumasu": false
     },
     "preset-japanese": {
       "sentence-length": false,
