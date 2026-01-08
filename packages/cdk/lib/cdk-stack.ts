@@ -138,6 +138,7 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
           },
           columns: [],
         },
+        partitionKeys: [], // Crawlerにパーティション検出を任せる
       },
     });
     rawDataTable.addDependency(this.glueDatabase);
@@ -165,6 +166,7 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
             },
             columns: [],
           },
+          partitionKeys: [], // Crawlerにパーティション検出を任せる
         },
       },
     );
@@ -204,7 +206,6 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
       name: 'switchbot-raw-data-crawler',
       description: 'Crawler to update switchbot_raw_data table schema',
       tablePrefix: '',
-      schedule: { scheduleExpression: 'cron(0 2 * * ? *)' },
       schemaChangePolicy: {
         updateBehavior: 'UPDATE_IN_DATABASE',
         deleteBehavior: 'LOG',
@@ -227,7 +228,6 @@ export class SwitchBotDataPipelineStack extends cdk.Stack {
         name: 'switchbot-curated-data-crawler',
         description: 'Crawler to update switchbot_curated_data table schema',
         tablePrefix: '',
-        schedule: { scheduleExpression: 'cron(0 3 * * ? *)' },
         schemaChangePolicy: {
           updateBehavior: 'UPDATE_IN_DATABASE',
           deleteBehavior: 'LOG',
