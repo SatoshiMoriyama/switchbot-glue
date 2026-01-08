@@ -16,6 +16,8 @@
     "cdk:destroy": "pnpm --filter cdk run destroy",
     "test": "pnpm -r test",
     "test:cdk": "pnpm --filter cdk test",
+    "security:audit": "pnpm audit",
+    "security:check": "pnpm audit --audit-level high",
     "prepare": "husky"
   },
   "keywords": [],
@@ -41,6 +43,12 @@
     "blog_content/**/*.md": [
       "markdownlint-cli2",
       "textlint"
+    ],
+    "package.json": [
+      "pnpm audit --audit-level high"
+    ],
+    "pnpm-lock.yaml": [
+      "pnpm audit --audit-level high"
     ]
   }
 }
