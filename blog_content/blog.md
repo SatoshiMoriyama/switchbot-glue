@@ -49,7 +49,7 @@ https://pages.awscloud.com/rs/112-TZM-766/images/AWS-Black-Belt_2023_AWS-Glue_03
 
 1. 15 分おきに SwitchBot API を利用し、リビングに置いてある温湿度計の情報を取得
 2. 取得したデータを S3 に JSON 形式で保存
-3. 保存した JSON に対して、ETL JOB Parquet 形式に変換し、別に S3 に保存
+3. 保存した JSON に対して、ETL Jobで Parquet 形式に変換し、別に S3 に保存
 4. 変換した S3 上のデータに対して、crawler でカタログ（テーブル）を作成
 5. Amazon Athena を利用し、作成したテーブルにて SQL でクエリする
 
