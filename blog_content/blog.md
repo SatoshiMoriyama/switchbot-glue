@@ -298,7 +298,7 @@ Crawler の実行時に実際のデータソースに基づいたスキーマ・
 
 クローラの SerDe（サーデ）情報に'org.openx.data.jsonserde.JsonSerDe'を指定していると、起きる問題のようです。
 
-なお、SerDe（サーデ）とは Serializer / Deserializer（シリアライザ / デシリアライザ）の略称です。
+なお、SerDe（サーデ）とは Serializer / Deserializer（シリアライザー / デシリアライザー）の略称です。
 
 ```typescript:cdk-stack.ts
     const rawDataTable = new glue.CfnTable(this, 'SwitchBotRawDataTable', {
